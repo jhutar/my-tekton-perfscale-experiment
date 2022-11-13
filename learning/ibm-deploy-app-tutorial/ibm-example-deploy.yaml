@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      name: app-server
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app-server
+          ###image: hashicorp/http-echo:0.2.3
+          ###args:
+          ###  - "-text=bar"
+          ###  - "-listen=:3300"
+          image: quay.io/jhutar/tutorial-sampleapp:1.0
+          ###ports:
+          ###  - containerPort: 3300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+  labels:
+    app: app
+spec:
+  selector:
+    app: app
+  ports:
+    - port: 3300
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ibm-example-igress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - pathType: Prefix
+        path: "/app"
+        backend:
+          service:
+            name: app-service
+            port:
+              number: 3300
+---
+###apiVersion: projectcontour.io/v1
+###kind: HTTPProxy
+###metadata:
+###  name: app-rewrite
+###spec:
+###  virtualhost:
+###    fqdn: localhost
+###  routes:
+###    - services:
+###        - name: s1
+###          port: 80
+###      ###conditions:
+###      ###- prefix: /v1/api
+###      pathRewritePolicy:
+###        replacePrefix:
+###          - prefix: /app
+###            replacement: /
+###          ###- prefix: /
+###          ###  replacement: /app

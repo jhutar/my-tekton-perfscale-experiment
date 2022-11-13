@@ -1,0 +1,14 @@
+.*.swp
+
+# Repo I checked out for that IBM tutorial
+learning/ibm-deploy-app-tutorial/deploy-app-using-tekton-on-kubernetes/
+
+# Bunch of files 
+learning/kind-setup/ca.crt
+learning/kind-setup/ca.key
+learning/kind-setup/config
+learning/kind-setup/htpasswd
+learning/kind-setup/kind.csr
+learning/kind-setup/my-deployer.crt
+learning/kind-setup/my-deployer.csr
+learning/kind-setup/my-deployer.key

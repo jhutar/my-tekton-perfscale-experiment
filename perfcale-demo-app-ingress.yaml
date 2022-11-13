@@ -1,0 +1,19 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: perfscale-demo-igress
+  namespace: perfscale-demo-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - pathType: Prefix
+        path: "/app"
+        backend:
+          service:
+            name: perfscale-demo-service
+            port:
+              number: 80
