@@ -1,13 +1,11 @@
 # Our demo app
 
-Remove mentions about volumes in PostgreSQL pod and:
+Deploy and test the application is running:
 
-    $ kubectl apply -f ../perfscale-demo-app/deploy.yaml
-    $ kubectl -n perfscale-demo-app apply -f perfcale-demo-app-ingress.yaml
-    $ kubectl -n perfscale-demo-app apply -f perfcale-demo-app-ingress.yaml
+    $ kubectl apply -f perfscale-demo-app-deploy.yaml
     $ curl http://localhost/app
 
-Generate test data and start the test:
+Generate test data and connect to the pod with test code:
 
     $ kubectl -n perfscale-demo-app exec pod/perfscale-demo-app-556c65669-km5gn -- flask test-data
     $ kubectl -n perfscale-demo-app exec -it pod/testing-749cb7cb95-c75xb -- bash
