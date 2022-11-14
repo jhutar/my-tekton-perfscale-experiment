@@ -122,19 +122,6 @@ spec:
   selector:
     name: postgresql
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgresql
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: gp2
-  volumeMode: Filesystem
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
