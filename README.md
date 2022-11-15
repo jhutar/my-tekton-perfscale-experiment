@@ -9,3 +9,8 @@ My goal is to create a Tekton pipeline that deploys simple webapp, runs a perfor
     kubectl apply --filename pipeline.yaml
     kubectl apply --filename sa.yaml
     kubectl create --filename pipeline-run.yaml
+
+To re-run a pipeline run, just do this:
+
+    kubectl create --filename pipeline-run.yaml
+    tkn pipelinerun logs --follow --last
