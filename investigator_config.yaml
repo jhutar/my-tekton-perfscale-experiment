@@ -4,6 +4,7 @@ history:
   dir: results/
   matchers: |
     name: "{{ current.get('name') }}"
+    result: PASS
 
 # From here get current result that is supposed to be compared to historical results
 current:
