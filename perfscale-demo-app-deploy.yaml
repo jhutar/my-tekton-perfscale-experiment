@@ -23,7 +23,7 @@ spec:
             - upgrade
           env:
             - name: POSTGRESQL_HOST
-              value: postgresql.perfscale-demo-app.svc
+              value: postgresql
             - name: POSTGRESQL_PORT
               value: '5432'
             - name: POSTGRESQL_USER
@@ -47,7 +47,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: POSTGRESQL_HOST
-              value: postgresql.perfscale-demo-app.svc
+              value: postgresql
             - name: POSTGRESQL_PORT
               value: '5432'
             - name: POSTGRESQL_USER
@@ -162,49 +162,3 @@ spec:
       ###  - name: postgresql-data
       ###    persistentVolumeClaim:
       ###      claimName: postgresql
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: testing
-spec:
-  selector:
-    matchLabels:
-      app: testing
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: testing
-    spec:
-      containers:
-        - name: perfscale-demo-app
-          image: quay.io/rhcloudperfscale/perfscale-demo-app-testing:latest
-          imagePullPolicy: Always
-          command:
-            - sleep
-            - infinity
-###---
-###apiVersion: batch/v1
-###kind: Job
-###metadata:
-###  name: testing-job
-###spec:
-###  selector: {}
-###  template:
-###    metadata:
-###      name: testing-job
-###    spec:
-###      containers:
-###        - name: testing-job
-###          image: quay.io/rhcloudperfscale/perfscale-demo-app-testing:latest
-###          command:
-###            - locust
-###            - --locustfile=testing.py
-###            - --headless
-###            - -H=http://perfscale-demo-service.perfscale-demo-app.svc:80
-###            - --users=1
-###            - --spawn-rate=1
-###            - --run-time=3
-###            - --print-stats
-###      restartPolicy: Never
