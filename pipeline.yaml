@@ -2,6 +2,21 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
+  name: get-run-id
+spec:
+  results:
+    - name: run-id
+  steps:
+    - name: get-run-id
+      image: quay.io/jhutar/opl
+      script: |
+        #!/usr/bin/env bash
+        date --utc -Ins | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/_00_00$//' | tr -d '\n' > $(results.run-id.path)
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
   name: opl-cli
 spec:
   workspaces:
@@ -13,7 +28,7 @@ spec:
       type: string
       default: "status_data.py -h"
   steps:
-    - name: determine-pass-or-fail
+    - name: opl-cli
       image: quay.io/jhutar/opl
       workingDir: $(workspaces.main-dir.path)
       script: $(params.script)
@@ -33,7 +48,12 @@ spec:
     ###  default: latest
   workspaces:
     - name: linked-workspace
+    - name: results-ssh-credentials
   tasks:
+    - name: get-run-id
+      taskRef:
+        name: get-run-id
+
     - name: fetch-repository-tools
       taskRef:
         name: git-clone
@@ -64,17 +84,20 @@ spec:
 
     - name: fetch-repository-results
       taskRef:
-        name: git-clone
-      workspaces:
-        - name: output
-          workspace: linked-workspace
+        name: git-cli
       params:
-        - name: url
-          value: https://github.com/jhutar/my-tekton-perfscale-experiment-results
-        - name: subdirectory
-          value: "my-tekton-perfscale-experiment-results"
-        - name: deleteExisting
-          value: "true"
+        - name: GIT_USER_EMAIL
+          value: jhutar@redhat.com
+        - name: GIT_USER_NAME
+          value: Jan Hutar
+        - name: GIT_SCRIPT
+          value: |
+            git clone git@github.com:jhutar/my-tekton-perfscale-experiment-results.git
+      workspaces:
+        - name: ssh-directory
+          workspace: results-ssh-credentials
+        - name: source
+          workspace: linked-workspace
 
     - name: create-deployment
       taskRef:
@@ -113,9 +136,10 @@ spec:
       params:
         - name: script
           value: |
+            set -x
             export PYTHONPATH=$( pwd )/perfscale-demo-app/
             export STATUS_DATA_FILE=status-data.json
-            my-tekton-perfscale-experiment/test-with-opl.py --locust-local-runner --locust-num-clients 1 --locust-hatch-rate 10 --locust-host http://perfscale-demo-service:80 --test-duration 5
+            my-tekton-perfscale-experiment/test-with-opl.py --locust-local-runner --locust-num-clients 10 --locust-hatch-rate 10 --locust-host http://perfscale-demo-service:80 --test-duration 10
       workspaces:
         - name: main-dir
           workspace: linked-workspace
@@ -129,17 +153,9 @@ spec:
       params:
         - name: script
           value: |
-            ls -alh
-            MYID=$( date --utc -Ins | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/_00_00$//' )
-            status_data.py --status-data-file status-data.json --set id=$MYID
+            set -x
+            status_data.py --status-data-file status-data.json --set id=$(tasks.get-run-id.results.run-id)
             pass_or_fail.py --config my-tekton-perfscale-experiment/investigator_config.yaml --current-file status-data.json -d || true
-            mv status-data.json my-tekton-perfscale-experiment-results/status-data-$MYID.json
-            cd my-tekton-perfscale-experiment-results/
-            git config --global --add safe.directory /workspace/main-dir/my-tekton-perfscale-experiment
-            git add status-data-$MYID.json
-            git config user.email "you@example.com"
-            git config user.name "Your Name"
-            git commit -m "Adding result $MYID"
       workspaces:
         - name: main-dir
           workspace: linked-workspace
@@ -147,15 +163,23 @@ spec:
     - name: push-results
       taskRef:
         name: git-cli
+      runAfter:
+        - determine-results
       params:
+        - name: GIT_USER_EMAIL
+          value: jhutar@redhat.com
+        - name: GIT_USER_NAME
+          value: Jan Hutar
         - name: GIT_SCRIPT
           value: |
+            mv status-data.json my-tekton-perfscale-experiment-results/status-data-$(tasks.get-run-id.results.run-id).json
             cd my-tekton-perfscale-experiment-results/
+            git add status-data-$(tasks.get-run-id.results.run-id).json
+            git commit -m "Adding result $(tasks.get-run-id.results.run-id)"
             git status
             git push
       workspaces:
         - name: ssh-directory
           workspace: results-ssh-credentials
-        - name: main-dir
+        - name: source
           workspace: linked-workspace
-
