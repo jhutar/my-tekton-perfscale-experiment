@@ -1,4 +1,34 @@
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: perfscale-demo-app-pipeline-sa
+secrets: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: perfscale-demo-app-pipeline-role
+rules:
+- apiGroups: ["extensions", "apps", ""]
+  resources: ["services", "deployments", "pods", "pvc", "job", "secrets"]
+  verbs: ["get", "create", "update", "patch", "list", "delete"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: perfscale-demo-app-pipeline-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: perfscale-demo-app-pipeline-role
+subjects:
+- kind: ServiceAccount
+  name: perfscale-demo-app-pipeline-sa
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
@@ -12,7 +42,6 @@ spec:
       script: |
         #!/usr/bin/env bash
         date --utc -Ins | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/_00_00$//' | tr -d '\n' > $(results.run-id.path)
-
 ---
 apiVersion: tekton.dev/v1beta1
 kind: Task
