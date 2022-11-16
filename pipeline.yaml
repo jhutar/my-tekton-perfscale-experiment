@@ -39,13 +39,6 @@ metadata:
   name: perfscale-demo-app-pipeline
 spec:
   params: []
-    ###- name: IMAGE
-    ###  description: Image description
-    ###  type: string
-    ###  default: "docker.io/joeshiett/nodejs-app"
-    ###- name: TAG
-    ###  description: Preferred tag
-    ###  default: latest
   workspaces:
     - name: linked-workspace
     - name: results-ssh-credentials
@@ -108,6 +101,8 @@ spec:
         - name: script
           value: |
             kubectl apply --filename my-tekton-perfscale-experiment/perfscale-demo-app-deploy.yaml
+            kubectl rollout status deployment/postgresql
+            kubectl rollout status deployment/perfscale-demo-app
       workspaces:
         - name: manifest-dir
           workspace: linked-workspace
@@ -120,12 +115,9 @@ spec:
       params:
         - name: script
           value: |
+            set -x
             pod=$( kubectl get pods --no-headers -l app=perfscale-demo-app -o custom-columns=":metadata.name" )
-            ###kubectl exec "pod/$pod" -- bash -c "export FLASK_APP=myapp.py; flask test-data"
-            echo "FIXME $pod"
-      workspaces:
-        - name: manifest-dir
-          workspace: linked-workspace
+            kubectl exec "pod/$pod" -- bash -c "export FLASK_APP=myapp.py; flask test-data"
 
     - name: run-test
       taskRef:
@@ -139,7 +131,7 @@ spec:
             set -x
             export PYTHONPATH=$( pwd )/perfscale-demo-app/
             export STATUS_DATA_FILE=status-data.json
-            my-tekton-perfscale-experiment/test-with-opl.py --locust-local-runner --locust-num-clients 10 --locust-hatch-rate 10 --locust-host http://perfscale-demo-service:80 --test-duration 10
+            my-tekton-perfscale-experiment/test-with-opl.py --locust-local-runner --locust-num-clients 10 --locust-hatch-rate 10 --locust-host http://perfscale-demo-service:80 --test-duration 100 || true
       workspaces:
         - name: main-dir
           workspace: linked-workspace
@@ -175,11 +167,28 @@ spec:
             mv status-data.json my-tekton-perfscale-experiment-results/status-data-$(tasks.get-run-id.results.run-id).json
             cd my-tekton-perfscale-experiment-results/
             git add status-data-$(tasks.get-run-id.results.run-id).json
+            git add decisions.csv
             git commit -m "Adding result $(tasks.get-run-id.results.run-id)"
-            git status
+            git pull --rebase
             git push
       workspaces:
         - name: ssh-directory
           workspace: results-ssh-credentials
         - name: source
+          workspace: linked-workspace
+
+    - name: delete-deployment
+      taskRef:
+        name: kubernetes-actions
+      runAfter:
+        - push-results
+      params:
+        - name: script
+          value: |
+            kubectl delete --filename my-tekton-perfscale-experiment/perfscale-demo-app-deploy.yaml
+            # Old kubectl in kubernetes-actions? https://github.com/kubernetes/kubernetes/issues/96676
+            kubectl wait --for=delete deployment/postgresql || true
+            kubectl wait --for=delete deployment/perfscale-demo-app || true
+      workspaces:
+        - name: manifest-dir
           workspace: linked-workspace

@@ -5,6 +5,10 @@ history:
   matchers: |
     name: "{{ current.get('name') }}"
     result: PASS
+    parameters.locust.host: "{{ current.get('parameters.locust.host') }}"
+    parameters.locust.num_clients: {{ current.get('parameters.locust.num_clients') }}
+    parameters.locust.hatch_rate: {{ current.get('parameters.locust.hatch_rate') }}
+    parameters.test.duration: {{ current.get('parameters.test.duration') }}
 
 # From here get current result that is supposed to be compared to historical results
 current:
@@ -30,4 +34,4 @@ sets:
 # Shuld we log our decisions somewhere?
 decisions:
   type: csv
-  filename: results/decisions.csv
+  filename: my-tekton-perfscale-experiment-results/decisions.csv
