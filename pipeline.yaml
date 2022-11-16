@@ -167,7 +167,7 @@ spec:
             mv status-data.json my-tekton-perfscale-experiment-results/status-data-$(tasks.get-run-id.results.run-id).json
             cd my-tekton-perfscale-experiment-results/
             git add status-data-$(tasks.get-run-id.results.run-id).json
-            git add decisions.csv
+            git add decisions.csv || true
             git commit -m "Adding result $(tasks.get-run-id.results.run-id)"
             git pull --rebase
             git push
