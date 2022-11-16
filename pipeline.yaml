@@ -1,3 +1,23 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: opl-cli
+spec:
+  workspaces:
+    - name: main-dir
+      description: Volume with data you want to work with.
+  params:
+    - name: script
+      description: The OPL CLI script to run
+      type: string
+      default: "status_data.py -h"
+  steps:
+    - name: determine-pass-or-fail
+      image: quay.io/jhutar/opl
+      workingDir: $(workspaces.main-dir.path)
+      script: $(params.script)
+---
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
@@ -14,7 +34,7 @@ spec:
   workspaces:
     - name: linked-workspace
   tasks:
-    - name: fetch-repository
+    - name: fetch-repository-tools
       taskRef:
         name: git-clone
       workspaces:
@@ -24,34 +44,118 @@ spec:
         - name: url
           value: https://github.com/jhutar/my-tekton-perfscale-experiment
         - name: subdirectory
-          value: ""
+          value: "my-tekton-perfscale-experiment"
         - name: deleteExisting
           value: "true"
-    ###- name: build-push-image
-    ###  taskRef:
-    ###    name: buildah
-    ###  runAfter:
-    ###    - fetch-repository
-    ###  workspaces:
-    ###    - name: source
-    ###      workspace: linked-workspace
-    ###  params:
-    ###    - name: IMAGE
-    ###      value: "$(params.IMAGE):$(params.TAG)"
-    ###    - name: CONTEXT
-    ###      value: "src"
-    ###    - name: FORMAT
-    ###      value: "docker"
+
+    - name: fetch-repository-app
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: linked-workspace
+      params:
+        - name: url
+          value: https://github.com/jhutar/perfscale-demo-app
+        - name: subdirectory
+          value: "perfscale-demo-app"
+        - name: deleteExisting
+          value: "true"
+
+    - name: fetch-repository-results
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: linked-workspace
+      params:
+        - name: url
+          value: https://github.com/jhutar/my-tekton-perfscale-experiment-results
+        - name: subdirectory
+          value: "my-tekton-perfscale-experiment-results"
+        - name: deleteExisting
+          value: "true"
+
     - name: create-deployment
       taskRef:
         name: kubernetes-actions
       runAfter:
-        ###- build-push-image
-        - fetch-repository
+        - fetch-repository-tools
       params:
         - name: script
           value: |
-            kubectl apply --filename perfscale-demo-app-deploy.yaml
+            kubectl apply --filename my-tekton-perfscale-experiment/perfscale-demo-app-deploy.yaml
       workspaces:
         - name: manifest-dir
           workspace: linked-workspace
+
+    - name: create-test-data
+      taskRef:
+        name: kubernetes-actions
+      runAfter:
+        - create-deployment
+      params:
+        - name: script
+          value: |
+            pod=$( kubectl get pods --no-headers -l app=perfscale-demo-app -o custom-columns=":metadata.name" )
+            ###kubectl exec "pod/$pod" -- bash -c "export FLASK_APP=myapp.py; flask test-data"
+            echo "FIXME $pod"
+      workspaces:
+        - name: manifest-dir
+          workspace: linked-workspace
+
+    - name: run-test
+      taskRef:
+        name: opl-cli
+      runAfter:
+        - create-test-data
+        - fetch-repository-app
+      params:
+        - name: script
+          value: |
+            export PYTHONPATH=$( pwd )/perfscale-demo-app/
+            export STATUS_DATA_FILE=status-data.json
+            my-tekton-perfscale-experiment/test-with-opl.py --locust-local-runner --locust-num-clients 1 --locust-hatch-rate 10 --locust-host http://perfscale-demo-service:80 --test-duration 5
+      workspaces:
+        - name: main-dir
+          workspace: linked-workspace
+
+    - name: determine-results
+      taskRef:
+        name: opl-cli
+      runAfter:
+        - run-test
+        - fetch-repository-results
+      params:
+        - name: script
+          value: |
+            ls -alh
+            MYID=$( date --utc -Ins | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/_00_00$//' )
+            status_data.py --status-data-file status-data.json --set id=$MYID
+            pass_or_fail.py --config my-tekton-perfscale-experiment/investigator_config.yaml --current-file status-data.json -d || true
+            mv status-data.json my-tekton-perfscale-experiment-results/status-data-$MYID.json
+            cd my-tekton-perfscale-experiment-results/
+            git config --global --add safe.directory /workspace/main-dir/my-tekton-perfscale-experiment
+            git add status-data-$MYID.json
+            git config user.email "you@example.com"
+            git config user.name "Your Name"
+            git commit -m "Adding result $MYID"
+      workspaces:
+        - name: main-dir
+          workspace: linked-workspace
+
+    - name: push-results
+      taskRef:
+        name: git-cli
+      params:
+        - name: GIT_SCRIPT
+          value: |
+            cd my-tekton-perfscale-experiment-results/
+            git status
+            git push
+      workspaces:
+        - name: ssh-directory
+          workspace: results-ssh-credentials
+        - name: main-dir
+          workspace: linked-workspace
+

@@ -20,3 +20,6 @@ spec:
           resources:
             requests:
               storage: 1Gi
+    - name: results-ssh-credentials
+      secret:
+        secretName: my-tekton-perfscale-experiment-results-ssh-credentials

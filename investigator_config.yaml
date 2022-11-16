@@ -1,7 +1,7 @@
 # Get historical test results from here
 history:
   type: sd_dir
-  dir: results/
+  dir: my-tekton-perfscale-experiment-results/
   matchers: |
     name: "{{ current.get('name') }}"
     result: PASS
